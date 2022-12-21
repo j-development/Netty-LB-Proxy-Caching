@@ -65,6 +65,7 @@ public class NodeOrchestrator {
 		runningNodes.remove(last);
 	}
 
+	// Closing all nodes in each list
 	public synchronized void closeNodes() {
 		alive = false;
 		runningNodes.forEach(Node::stop);
@@ -102,6 +103,7 @@ public class NodeOrchestrator {
 
 		for (int i = 0; i < runningNodes.size(); i++) {
 			Node node = runningNodes.get(i);
+			// Want to check if nodes are still alive
 			synchronized (this) {
 				checkNodeStatus(node);
 			}
@@ -116,21 +118,19 @@ public class NodeOrchestrator {
 
 		// If requests are above 1.0 avg, start a new Node
 		if (requests > 1.0) {
+			deprovisionPoints = 0;
 			provision(1);
 		}
 
 		// If requests are below 0.5 avg it gets a point, starts closing a node when deprovision limit is reached
-		if (requests < 0.5) {
+		if (requests < 0.5 && runningNodes.size() > minNodes ) {
 			deprovisionPoints++;
 			if (deprovisionPoints > deprovisionLimit) {
 				deprovisionPoints = 0;
-				if (runningNodes.size() > minNodes) {
-					closeLast();
-				}
+				closeLast();
 			}
 		}
 
-		// Want to check if nodes are still alive
 
 	}
 
@@ -159,7 +159,7 @@ public class NodeOrchestrator {
 				e.printStackTrace();
 			}
 		}
-		;
+
 	}
 
 	private void PingNode(Node node) {

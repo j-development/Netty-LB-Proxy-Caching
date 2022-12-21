@@ -31,7 +31,7 @@ public class ReverseProxyServer {
 			boot
 					.group(bossGroup, workerGroup)
 					.channel(NioServerSocketChannel.class)
-					.childHandler(new HttpReverseProxyInitializer(host, port, this));
+					.childHandler(new HttpReverseProxyInitializer(host, this));
 
 			System.out.println("Starting connection on port: " + port);
 			Channel ch = boot.bind(port).sync().channel();

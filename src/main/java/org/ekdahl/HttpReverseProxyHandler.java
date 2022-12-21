@@ -1,8 +1,6 @@
 package org.ekdahl;
 
 import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
-import com.google.common.cache.LoadingCache;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -12,36 +10,25 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 
-import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 public class HttpReverseProxyHandler extends SimpleChannelInboundHandler<ByteBuf> {
 	private final ReverseProxyServer server;
-	private final int port;
 	private final String host;
 	private Channel channel;
 	private final Cache<String, Object> cache;
 	private String pathkey = "";
 
-	public HttpReverseProxyHandler(ReverseProxyServer server, int port, String host) {
+	public HttpReverseProxyHandler(ReverseProxyServer server, String host) {
 		this.server = server;
-		this.port = port;
 		this.host = host;
-		this.cache = getCache();
+		this.cache = CacheModule.getCache();
 	}
 
-	//Cache from Guava
-	private Cache<String, Object> getCache() {
-		Cache<String, Object> cache = CacheBuilder.newBuilder()
-				.expireAfterWrite(1, TimeUnit.HOURS) // Expire after 1 hour
-				.maximumSize(1000) // Maximum size of 1000 entries
-				.build();
-		return cache;
-	}
+
 
 	@Override // Called when a channel established a connection and the channel
 	public void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -83,7 +70,7 @@ public class HttpReverseProxyHandler extends SimpleChannelInboundHandler<ByteBuf
 										node.addRequest();
 										System.out.println("pid " + node.getProcess().pid());
 										if(!Objects.equals(pathkey, "")){
-											cache.put(pathkey, byteBuf.copy());
+											cache.put(pathkey, byteBuf.copy()); // Comment out this if you want to check out loadbalancing without caching
 											pathkey = "";
 										}
 
@@ -107,7 +94,7 @@ public class HttpReverseProxyHandler extends SimpleChannelInboundHandler<ByteBuf
 	}
 
 	@Override // Called when then channel is closed
-	public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+	public void channelInactive(ChannelHandlerContext ctx) {
 		System.out.println("Channel inactive");
 		if (this.channel != null) {
 			this.channel.close();
@@ -116,14 +103,13 @@ public class HttpReverseProxyHandler extends SimpleChannelInboundHandler<ByteBuf
 
 	// This method is called when a message is received, in this case a ByteBuf, could also be a FullHttpRequest
 	@Override
-	protected void channelRead0(ChannelHandlerContext ctx, ByteBuf buf) throws Exception {
+	protected void channelRead0(ChannelHandlerContext ctx, ByteBuf buf) {
 		var buf1 = buf.copy();
 		String key = keyFromRequest(buf1);
-		cacheHandler(ctx, buf, key);
-
+		cacheAwareHandler(ctx, buf, key);
 	}
 
-	private void cacheHandler(ChannelHandlerContext ctx, ByteBuf buf, String key) {
+	private void cacheAwareHandler(ChannelHandlerContext ctx, ByteBuf buf, String key) {
 		Object data = cache.getIfPresent(key);
 		ByteBuf buf1 = (ByteBuf) data;
 		if (data != null) {
@@ -143,7 +129,7 @@ public class HttpReverseProxyHandler extends SimpleChannelInboundHandler<ByteBuf
 	}
 
 	@Override // Called when an exception is caught
-	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+	public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
 		cause.printStackTrace();
 		ctx.channel().close();
 		channel.close();
