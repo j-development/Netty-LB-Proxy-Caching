@@ -22,6 +22,7 @@ public class HttpReverseProxyInitializer extends ChannelInitializer<SocketChanne
 	protected void initChannel(SocketChannel socketChannel) throws Exception {
 		socketChannel.pipeline()
 				//.addLast(new LoggingHandler(LogLevel.INFO))   // Adding channelhandlers to the pipeline
+				.addLast()
 				.addLast(new HttpReverseProxyHandler(server, port, host));
 
 	}
